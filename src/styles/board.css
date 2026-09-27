@@ -1,0 +1,349 @@
+/*
+ * Board & node styles. Cells are painted imperatively by BoardEngine (className only),
+ * so everything visual about a node lives here.
+ *
+ *   element      → background: empty / visited / path overlay (+ its animation)
+ *   ::before     → wall block
+ *   ::after      → glyph: weight, start, target, bomb
+ */
+
+.board {
+  --cell: 26px;
+  --gap: 1px;
+  --visit-duration: 1.1s;
+  --path-duration: 0.6s;
+  --pop-duration: 0.3s;
+
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 1), var(--cell));
+  grid-auto-rows: var(--cell);
+  gap: var(--gap);
+  padding: var(--gap);
+  background: var(--c-grid);
+  border-radius: 6px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: crosshair;
+}
+
+.board.is-busy {
+  cursor: progress;
+}
+
+.board[data-dragging],
+.board[data-dragging] .cell {
+  cursor: grabbing !important;
+}
+
+.board[data-dragging] .cell::after {
+  animation: none;
+}
+
+.cell {
+  position: relative;
+  background: var(--c-cell);
+  border-radius: 2px;
+}
+
+/* ── Hover affordance ─────────────────────────────────────────────── */
+
+@media (hover: hover) {
+  .board:not(.is-busy):not([data-dragging]) .cell:hover {
+    box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.22);
+  }
+}
+
+.board:not(.is-busy) .cell--start,
+.board:not(.is-busy) .cell--target,
+.board:not(.is-busy) .cell--bomb {
+  cursor: grab;
+}
+
+/* ── Walls ────────────────────────────────────────────────────────── */
+
+.cell--wall::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 1px;
+  background: var(--c-wall);
+  /* Spread over the 1px grid gap so neighbouring walls fuse into solid blocks. */
+  box-shadow: 0 0 0 var(--gap) var(--c-wall);
+  animation: wall-pop var(--pop-duration) cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+
+.cell--wall {
+  z-index: 1;
+}
+
+@keyframes wall-pop {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.2;
+    border-radius: 40%;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    border-radius: 1px;
+  }
+}
+
+/* ── Glyphs (weight + special nodes) ──────────────────────────────── */
+
+.cell--weight::after,
+.cell--start::after,
+.cell--target::after,
+.cell--bomb::after {
+  content: '';
+  position: absolute;
+  inset: 12%;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+  animation: glyph-pop var(--pop-duration) cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+.cell--weight {
+  --icon: var(--icon-weight);
+  color: var(--c-weight);
+}
+
+.cell--weight::after {
+  inset: 9%;
+}
+
+.cell--start,
+.cell--target,
+.cell--bomb {
+  z-index: 2;
+  border-radius: 5px;
+}
+
+.cell--start {
+  --icon: var(--icon-start);
+  color: var(--c-start);
+  background: color-mix(in srgb, var(--c-start) 16%, var(--c-cell));
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--c-start) 55%, transparent),
+    0 0 14px -2px color-mix(in srgb, var(--c-start) 60%, transparent);
+}
+
+.cell--target {
+  --icon: var(--icon-target);
+  color: var(--c-target);
+  background: color-mix(in srgb, var(--c-target) 16%, var(--c-cell));
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--c-target) 55%, transparent),
+    0 0 14px -2px color-mix(in srgb, var(--c-target) 60%, transparent);
+}
+
+.cell--bomb {
+  --icon: var(--icon-bomb);
+  color: var(--c-bomb);
+  background: color-mix(in srgb, var(--c-bomb) 16%, var(--c-cell));
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--c-bomb) 55%, transparent),
+    0 0 14px -2px color-mix(in srgb, var(--c-bomb) 60%, transparent);
+}
+
+.cell--target::before,
+.cell--bomb::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 6px;
+  border: 1.5px solid currentColor;
+  opacity: 0;
+  animation: beacon 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes beacon {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  70%,
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+@keyframes glyph-pop {
+  0% {
+    transform: scale(0.2) rotate(-20deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
+/* ── Search overlay ───────────────────────────────────────────────── */
+
+.cell--visited {
+  background: var(--c-visited);
+  animation: visit var(--visit-duration) ease-out both;
+}
+
+.cell--visited-bomb {
+  background: var(--c-visited-bomb);
+  animation: visit-bomb var(--visit-duration) ease-out both;
+}
+
+@keyframes visit {
+  0% {
+    transform: scale(0.25);
+    background: #b9a8ff;
+    border-radius: 50%;
+  }
+  35% {
+    background: #6f8bff;
+    border-radius: 45%;
+  }
+  70% {
+    transform: scale(1.15);
+    background: #2ee6d6;
+    border-radius: 25%;
+  }
+  100% {
+    transform: scale(1);
+    background: var(--c-visited);
+    border-radius: 2px;
+  }
+}
+
+@keyframes visit-bomb {
+  0% {
+    transform: scale(0.25);
+    background: #ffd08a;
+    border-radius: 50%;
+  }
+  35% {
+    background: #ff7eb6;
+    border-radius: 45%;
+  }
+  70% {
+    transform: scale(1.15);
+    background: #d45cff;
+    border-radius: 25%;
+  }
+  100% {
+    transform: scale(1);
+    background: var(--c-visited-bomb);
+    border-radius: 2px;
+  }
+}
+
+.cell--path {
+  z-index: 1;
+  background: var(--c-path);
+  box-shadow: 0 0 10px -1px color-mix(in srgb, var(--c-path) 70%, transparent);
+  animation: path var(--path-duration) cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+
+.cell--path.cell--weight {
+  color: #3a2a00;
+}
+
+@keyframes path {
+  0% {
+    transform: scale(0.35);
+    background: #fffbe0;
+    border-radius: 50%;
+  }
+  60% {
+    transform: scale(1.22);
+    border-radius: 30%;
+  }
+  100% {
+    transform: scale(1);
+    background: var(--c-path);
+    border-radius: 2px;
+  }
+}
+
+.cell--carved {
+  animation: carve 0.5s ease-out both;
+}
+
+@keyframes carve {
+  0% {
+    background: color-mix(in srgb, var(--c-primary) 55%, var(--c-cell));
+  }
+  100% {
+    background: var(--c-cell);
+  }
+}
+
+/* Instant updates: no replayed animations. */
+.cell--static::before,
+.cell--static.cell--weight::after,
+.cell--settled,
+.cell--settled::before,
+.cell--settled::after {
+  animation: none !important;
+}
+
+/* Special nodes keep their beacon even when settled. */
+.cell--target.cell--settled::before,
+.cell--bomb.cell--settled::before {
+  animation: beacon 2.4s ease-out infinite !important;
+}
+
+/* ── Stand-alone swatches (legend, tutorial) ───────────────────────── */
+
+.swatch {
+  --cell: 20px;
+  --gap: 1px;
+  display: inline-grid;
+  place-items: stretch;
+  width: var(--cell);
+  height: var(--cell);
+  flex: none;
+  border-radius: 4px;
+  background: var(--c-grid);
+  padding: 0;
+}
+
+.swatch > .cell {
+  animation: none;
+}
+
+.swatch > .cell::before,
+.swatch > .cell::after {
+  animation: none;
+}
+
+.swatch > .cell--target::before,
+.swatch > .cell--bomb::before {
+  display: none;
+}
+
+.swatch > .cell--path {
+  box-shadow: 0 0 8px -1px color-mix(in srgb, var(--c-path) 70%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board .cell,
+  .board .cell::before,
+  .board .cell::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ── Tutorial mini boards ─────────────────────────────────────────── */
+
+.board.is-mini {
+  cursor: default;
+  pointer-events: none;
+  border-radius: 8px;
+}
