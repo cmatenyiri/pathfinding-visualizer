@@ -2,10 +2,9 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 // https://vite.dev/config/
-export default defineConfig(({ command, isPreview }) => ({
-  // GitHub Pages serves the site from https://cmatenyiri.github.io/pathfinding-visualizer/,
-  // so the build (and `vite preview` of it) needs that prefix. The dev server serves from `/`.
-  base: command === 'build' || isPreview ? '/pathfinding-visualizer/' : '/',
+export default defineConfig({
+  // GitHub Pages serves the site from /<repo>/; the deploy workflow passes that path in.
+  base: process.env.BASE_PATH ?? '/',
   plugins: [react()],
   build: {
     rolldownOptions: {
@@ -25,4 +24,4 @@ export default defineConfig(({ command, isPreview }) => ({
       },
     },
   },
-}));
+});
